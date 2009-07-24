@@ -117,8 +117,16 @@ module MachinistActiveRecordSpecs
         end
         
         it "should set the attributes of the child object" do
-          pending("#create does not work as expected on habtm, fix rails!") do 
-            @post.users.each {|user| user.name.should == "Fred" }
+          @post.users.each {|user| user.name.should == "Fred" }
+        end
+        
+        it "should not need two queries instead of 1" do
+          pending("#create method does not support a block correctly for habtm") do
+            @post.users.create do |object|
+              object.name = "Fred"
+            end
+
+            @post.users.last.name.should == "Fred"
           end
         end
       end

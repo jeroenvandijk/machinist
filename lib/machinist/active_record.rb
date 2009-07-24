@@ -77,9 +77,10 @@ module Machinist
 
       unless Machinist.nerfed?
         # We are calling create here instead of build and save because they do not work correctly on habtm associations, this also means we can't call build early
-        created_instance = create!{ |instance_to_create|
-          lathe.object.attributes.each_pair { |method, value|  instance_to_create.send("#{method}=", value) }
-        }
+        created_instance = create!(lathe.object.attributes)
+        lathe.object.attributes.each_pair { |method, value|  created_instance.send("#{method}=", value) } # to set the all the protected attributes
+        created_instance.save!
+        created_instance.reload
         lathe.instance_eval { @object = created_instance }
       end
       lathe.object(&block)
