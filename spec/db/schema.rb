@@ -20,10 +20,16 @@ ActiveRecord::Schema.define(:version => 0) do
   
   create_table :users, :force => true do |t|
     t.column :name, :string
+    t.column :secret, :string
   end
   
   create_table :posts_users, :force => true, :id => false do |t|
     t.column :post_id, :integer
     t.column :user_id, :integer
+  end
+  
+  create_table :subscriptions, :force => true, :id => false do |t|
+    t.column :person_id, :integer
+    t.column :post_id, :integer
   end
 end

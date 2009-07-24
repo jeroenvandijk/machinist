@@ -4,15 +4,26 @@ require 'machinist/active_record'
 module MachinistActiveRecordSpecs
   
   class User < ActiveRecord::Base
+    attr_protected :secret
     has_and_belongs_to_many :posts
   end
   
   class Person < ActiveRecord::Base
     attr_protected :password
+    has_many :subscriptions
+    has_many :posts, :through => :subscriptions
+  end
+
+  class Subscription < ActiveRecord::Base
+    belongs_to :post
+    belongs_to :person
   end
 
   class Post < ActiveRecord::Base
     has_many :comments
+    has_many :subscriptions
+    has_many :people, :through => :subscriptions
+    
     has_and_belongs_to_many :users
   end
 
@@ -20,6 +31,8 @@ module MachinistActiveRecordSpecs
     belongs_to :post
     belongs_to :author, :class_name => "Person"
   end
+  
+  
 
   describe Machinist, "ActiveRecord adapter" do  
     before(:suite) do
@@ -32,6 +45,14 @@ module MachinistActiveRecordSpecs
       Person.clear_blueprints!
       Post.clear_blueprints!
       Comment.clear_blueprints!
+
+      # We need to truncate the database before each spec
+       ActiveRecord::Base.connection.tables.each do |table|
+         ActiveRecord::Base.connection.execute("DELETE FROM #{table}")
+         ActiveRecord::Base.connection.execute("DELETE FROM sqlite_sequence where name='#{table}'")
+       end                                                                                                                               
+      ActiveRecord::Base.connection.execute("VACUUM")
+      
     end
   
     describe "make method" do
@@ -95,41 +116,111 @@ module MachinistActiveRecordSpecs
       end
       
       describe "on a has_and_belongs_to_many assocation" do
-        before(:each) do
-          User.blueprint { name "Fred" }
-          Post.blueprint {}
+        context "in a normal case" do
+          before(:each) do
+            User.blueprint { name "Fred" }
+            Post.blueprint {}
           
-          @post = Post.make
-          @users = []
-          5.times { @users << @post.users.make }
-        end
+            @post = Post.make
+            @users = []
+            5.times { @users << @post.users.make }
+          end
         
-        it "should create the right amount of children" do
-          @post.users.size.should == 5
-        end
+          it "should create the right amount of children" do
+            @post.users.size.should == 5
+          end
         
-        it "should save the created objects" do
-          @post.users.each{ |user| user.should_not be_new_record }
-        end
+          it "should save the created objects" do
+            @post.users.each{ |user| user.should_not be_new_record }
+          end
         
-        it "should set the parent association on the created object" do
-          @users.each {|user| user.posts.first.should == @post }
-        end
+          it "should set the parent association on the created object" do
+            @users.each {|user| user.posts.first.should == @post }
+          end
         
-        it "should set the attributes of the child object" do
-          @post.users.each {|user| user.name.should == "Fred" }
-        end
+          it "should set the attributes of the child object" do
+            @post.users.each {|user| user.name.should == "Fred" }
+          end
         
-        it "should not need two queries instead of 1" do
-          pending("#create method does not support a block correctly for habtm") do
-            @post.users.create do |object|
-              object.name = "Fred"
-            end
+          it "should not need two queries instead of 1" do
+            pending("#create method does not support a block correctly for habtm") do
+              @post.users.create do |object|
+                object.name = "Fred"
+              end
 
-            @post.users.last.name.should == "Fred"
+              @post.users.last.name.should == "Fred"
+            end
+          end
+        end
+        
+        context "with a protected attribute" do
+          before(:each) do
+            Post.blueprint {}
+            User.blueprint { secret "secret" }
+
+            post = Post.make
+            post.users.make
+          end
+          
+          it "should set the attribute correctly" do
+            Post.all.first.users.first.secret.should == "secret"
           end
         end
       end
+      
+      describe "on a has_many :through association" do
+        context "in a normal case" do
+          before(:each) do
+            Person.blueprint { }
+            Post.blueprint { title "Fred goes wild" }
+          
+            @person = Person.make
+            @post = @person.posts.make
+          end
+        
+          it "should couple the parent to the child object" do
+            @post.people.first.should == @person
+          end
+        
+          it "should couple the child to the parent object" do
+            @person.posts.first.should == @post
+          end
+          
+          it "should have the same join object" do
+            @post.subscriptions.should == @person.subscriptions
+          end
+        
+          it "should set the attributes correctly" do
+            @person.posts.first.title.should == "Fred goes wild"
+          end
+          
+          it "should save the created join object" do
+            @post.subscriptions.first.should_not be_new_record
+          end
+        
+          it "should save the created object" do
+            @person.posts.first.should_not be_new_record
+          end
+        end
+        
+        context "with a protected attribute" do
+          before(:each) do
+            Person.blueprint { password "secret" }
+            Post.blueprint {}
+            post = Post.make
+            post.people.make            
+          end
+
+          it "should set the attribute correctly" do
+            Post.all.first.people.first.password.should == "secret"
+          end
+          
+        end
+        
+      end
+      
+
+      
     end
 
     describe "plan method" do

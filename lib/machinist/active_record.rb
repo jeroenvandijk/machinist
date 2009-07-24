@@ -74,13 +74,19 @@ module Machinist
     def make(*args, &block)
      instance = Machinist.nerfed? ? self.build : self.new
      lathe = Lathe.run(Machinist::ActiveRecordAdapter, instance, *args)
-
+     
       unless Machinist.nerfed?
         # We are calling create here instead of build and save because they do not work correctly on habtm associations, this also means we can't call build early
-        created_instance = create!(lathe.object.attributes)
-        lathe.object.attributes.each_pair { |method, value|  created_instance.send("#{method}=", value) } # to set the all the protected attributes
-        created_instance.save!
-        created_instance.reload
+        attributes_to_assign = lathe.object.attributes.slice(*column_names)
+        
+        created_instance = create!(attributes_to_assign)
+        attributes_to_assign.each_pair { |method, value|  
+          created_instance.send("#{method}=", value) # to set the all the protected attributes
+        }
+        if created_instance.changed? # Unfortunately we have to do another query if we have accessed protected methods
+          created_instance.save! 
+          created_instance.reload
+        end
         lathe.instance_eval { @object = created_instance }
       end
       lathe.object(&block)
