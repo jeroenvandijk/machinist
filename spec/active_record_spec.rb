@@ -3,14 +3,17 @@ require 'machinist/active_record'
 
 module MachinistActiveRecordSpecs
   
+  class User < ActiveRecord::Base
+    has_and_belongs_to_many :posts
+  end
+  
   class Person < ActiveRecord::Base
     attr_protected :password
-    has_and_belongs_to_many :posts
   end
 
   class Post < ActiveRecord::Base
-    has_and_belongs_to_many :people
     has_many :comments
+    has_and_belongs_to_many :users
   end
 
   class Comment < ActiveRecord::Base
@@ -93,24 +96,30 @@ module MachinistActiveRecordSpecs
       
       describe "on a has_and_belongs_to_many assocation" do
         before(:each) do
-          Person.blueprint {}
+          User.blueprint { name "Fred" }
           Post.blueprint {}
           
           @post = Post.make
-          @people = []
-          5.times { @people << @post.people.make }
+          @users = []
+          5.times { @users << @post.users.make }
         end
         
         it "should create the right amount of children" do
-          @post.people.size.should == 5
+          @post.users.size.should == 5
         end
         
         it "should save the created objects" do
-          @post.people.each{ |person| person.should_not be_new_record }
+          @post.users.each{ |user| user.should_not be_new_record }
         end
         
         it "should set the parent association on the created object" do
-          @people.each {|person| person.posts.first.should == @post }
+          @users.each {|user| user.posts.first.should == @post }
+        end
+        
+        it "should set the attributes of the child object" do
+          pending("#create does not work as expected on habtm, fix rails!") do 
+            @post.users.each {|user| user.name.should == "Fred" }
+          end
         end
       end
     end

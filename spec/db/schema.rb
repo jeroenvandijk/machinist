@@ -18,8 +18,12 @@ ActiveRecord::Schema.define(:version => 0) do
     t.column :body, :text
   end
   
-  create_table :people_posts, :force => true, :id => false do |t|
-    t.column :person_id, :integer
+  create_table :users, :force => true do |t|
+    t.column :name, :string
+  end
+  
+  create_table :posts_users, :force => true, :id => false do |t|
     t.column :post_id, :integer
+    t.column :user_id, :integer
   end
 end
